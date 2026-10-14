@@ -1,0 +1,6 @@
+{
+  "name": "Infinix Gamer",
+  "description": "Official INFINIX GAMER hub with step-by-step verified social unlocker and owner admin panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

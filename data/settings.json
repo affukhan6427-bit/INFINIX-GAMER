@@ -1,0 +1,27 @@
+{
+  "settings": {
+    "websiteTitle": "INFINIX GAMER",
+    "websiteSubtitle": "Complete the 3 quick steps below to unlock your exclusive VIP gaming files, discord links, and rewards.",
+    "tiktokUrl": "https://www.tiktok.com/@infinixgamer",
+    "tiktokButtonText": "Follow on TikTok",
+    "instagramUrl": "https://www.instagram.com/infinixgamer",
+    "instagramButtonText": "Follow on Instagram",
+    "youtubeUrl": "https://www.youtube.com/@infinixgamer",
+    "youtubeButtonText": "Subscribe on YouTube",
+    "destinationUrl": "https://discord.gg/infinixgamer",
+    "unlockButtonText": "UNLOCK YOUR LINK",
+    "waitingSeconds": 15
+  },
+  "auth": {
+    "salt": "ade1ca2d71f7231abb97ba49eab42b3e",
+    "hash": "0541bee8949b5155db96d93f71bb2373093e57402e43396f93d93179cc250454ac4e340e5bac810bfc8775254326d8924eadfa5f48c4bdf6f17f323857eeed3b"
+  },
+  "analytics": {
+    "visits": 4,
+    "step1Clicks": 0,
+    "step2Clicks": 0,
+    "step3Clicks": 0,
+    "unlocks": 0,
+    "lastUpdated": "2026-10-14T12:49:44.646Z"
+  }
+}

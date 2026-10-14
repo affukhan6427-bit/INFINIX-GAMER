@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-orbitron: 'Orbitron', system-ui, sans-serif;
+    --font-rajdhani: 'Rajdhani', system-ui, sans-serif;
+    --font-space: 'Space Grotesk', system-ui, sans-serif;
+  }
+}
+
+.font-orbitron {
+  font-family: var(--font-orbitron);
+}
+
+.font-rajdhani {
+  font-family: var(--font-rajdhani);
+}
+
+.font-space {
+  font-family: var(--font-space);
+}
+
+/* Neon Glows */
+.neon-glow-green {
+  box-shadow: 0 0 25px rgba(0, 255, 102, 0.28), 0 0 50px rgba(0, 255, 102, 0.12);
+}
+
+.neon-glow-blue {
+  box-shadow: 0 0 25px rgba(6, 182, 212, 0.28), 0 0 50px rgba(6, 182, 212, 0.12);
+}
+
+.neon-border-green {
+  border-color: #00ff66;
+  box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
+}
+
+.neon-border-blue {
+  border-color: #06b6d4;
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+}
+
+.neon-text-green {
+  text-shadow: 0 0 12px rgba(0, 255, 102, 0.65), 0 0 24px rgba(0, 255, 102, 0.35);
+}
+
+.neon-text-blue {
+  text-shadow: 0 0 12px rgba(6, 182, 212, 0.65), 0 0 24px rgba(6, 182, 212, 0.35);
+}
+
+/* Cyber ambient grid */
+.cyber-grid {
+  background-size: 36px 36px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 255, 102, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+}
+
+/* Pulsing energy line */
+@keyframes energy-scan {
+  0% { transform: translateY(-100%); opacity: 0; }
+  50% { opacity: 0.8; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+.animate-energy-scan {
+  animation: energy-scan 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
