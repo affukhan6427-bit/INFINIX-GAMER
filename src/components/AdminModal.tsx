@@ -19,6 +19,7 @@ import {
   Youtube,
   Clock,
   Sparkles,
+  Camera,
 } from 'lucide-react';
 import { WebsiteSettings, AnalyticsStats } from '../types';
 import { soundManager } from '../utils/sound';
@@ -41,8 +42,18 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  // Tab state: 'settings' | 'analytics' | 'security'
-  const [activeTab, setActiveTab] = useState<'settings' | 'analytics' | 'security'>('settings');
+  // Tab state: 'settings' | 'analytics' | 'screenshots' | 'security'
+  const [activeTab, setActiveTab] = useState<'settings' | 'analytics' | 'screenshots' | 'security'>('settings');
+  const [submissions, setSubmissions] = useState<Array<{
+    id: string;
+    sessionId: string;
+    step: number;
+    platform: string;
+    timestamp: string;
+    screenshot: string;
+  }>>([]);
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<WebsiteSettings>({
@@ -114,6 +125,36 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     } finally {
       setIsLoadingSettings(false);
     }
+  };
+
+  const loadSubmissions = async (token: string) => {
+    setIsLoadingSubmissions(true);
+    try {
+      const response = await fetch('/api/admin/submissions', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSubmissions(data.submissions || []);
+      }
+    } catch {} finally {
+      setIsLoadingSubmissions(false);
+    }
+  };
+
+  const handleClearSubmissions = async () => {
+    if (!authToken || !window.confirm('Clear all uploaded proof screenshots?')) return;
+    try {
+      const response = await fetch('/api/admin/submissions', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSubmissions([]);
+        soundManager.playSuccess();
+      }
+    } catch {}
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -409,6 +450,22 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
                   <span>Analytics</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('screenshots');
+                    soundManager.playClick();
+                    if (authToken) loadSubmissions(authToken);
+                  }}
+                  className={`py-3 px-3 text-xs font-rajdhani font-bold uppercase tracking-wider border-b-2 transition-all flex items-center gap-1.5 ${
+                    activeTab === 'screenshots'
+                      ? 'border-cyan-400 text-cyan-300'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Screenshots</span>
                 </button>
 
                 <button
@@ -733,7 +790,115 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               </div>
             )}
 
-            {/* TAB 3: SECURITY */}
+            {/* TAB 3: SCREENSHOT SUBMISSIONS */}
+            {activeTab === 'screenshots' && (
+              <div className="p-4 sm:p-6 space-y-4 max-h-[68vh] overflow-y-auto">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-orbitron font-bold text-sm text-slate-200">User Proof Screenshots</h4>
+                    <p className="text-xs font-rajdhani text-slate-400">
+                      Verify follow & subscribe screenshots uploaded by visitors before unlocking
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => authToken && loadSubmissions(authToken)}
+                      className="text-xs font-rajdhani text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 px-2.5 py-1 rounded bg-cyan-950/30 flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Refresh</span>
+                    </button>
+                    {submissions.length > 0 && (
+                      <button
+                        onClick={handleClearSubmissions}
+                        className="text-xs font-rajdhani text-red-400 hover:text-red-300 border border-red-500/30 px-2.5 py-1 rounded bg-red-950/30 flex items-center gap-1 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Clear All</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {isLoadingSubmissions ? (
+                  <div className="py-12 text-center text-cyan-400 space-y-2">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                    <span className="text-xs font-orbitron">Loading submitted proofs...</span>
+                  </div>
+                ) : submissions.length === 0 ? (
+                  <div className="py-12 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl space-y-2">
+                    <Camera className="w-8 h-8 text-slate-600 mx-auto" />
+                    <div className="text-xs font-orbitron text-slate-400">No Screenshot Submissions Yet</div>
+                    <p className="text-[11px] font-space text-slate-600 max-w-sm mx-auto">
+                      Screenshots uploaded by users during TikTok, Instagram, and YouTube verification will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {submissions.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5 hover:border-cyan-500/40 transition-colors"
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-orbitron font-bold text-cyan-300 flex items-center gap-1">
+                            <span>Step 0{sub.step}</span>
+                            <span className="text-slate-600">·</span>
+                            <span className="text-emerald-400">{sub.platform}</span>
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-500">
+                            {new Date(sub.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+
+                        {/* Screenshot thumbnail */}
+                        <div
+                          onClick={() => setPreviewImage(sub.screenshot)}
+                          className="relative aspect-video rounded-lg overflow-hidden border border-slate-800 cursor-pointer group bg-black"
+                        >
+                          <img
+                            src={sub.screenshot}
+                            alt="Follow proof"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span className="px-2.5 py-1 rounded bg-black/80 text-white text-[10px] font-rajdhani font-bold flex items-center gap-1">
+                              <ExternalLink className="w-3 h-3" />
+                              <span>Click to enlarge</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-[10px] text-slate-500 font-mono flex items-center justify-between">
+                          <span>Session: {sub.sessionId}...</span>
+                          <span className="text-emerald-400 font-rajdhani font-semibold">Verified ✓</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Screenshot Lightbox Modal */}
+                {previewImage && (
+                  <div
+                    onClick={() => setPreviewImage(null)}
+                    className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer"
+                  >
+                    <div className="relative max-w-2xl max-h-[90vh] overflow-hidden rounded-xl border border-cyan-500/50">
+                      <img src={previewImage} alt="Enlarged proof" className="w-full h-auto max-h-[85vh] object-contain" />
+                      <button
+                        onClick={() => setPreviewImage(null)}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-black/80 text-white hover:text-cyan-400"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 4: SECURITY */}
             {activeTab === 'security' && (
               <form onSubmit={handleChangePassword} className="p-4 sm:p-6 space-y-4">
                 <div>

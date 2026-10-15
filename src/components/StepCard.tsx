@@ -1,5 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ExternalLink, Check, Lock, ArrowRight, Loader2, Clock, AlertCircle } from 'lucide-react';
+import {
+  ExternalLink,
+  Check,
+  Lock,
+  ArrowRight,
+  Loader2,
+  Clock,
+  AlertCircle,
+  Camera,
+  Upload,
+  Image as ImageIcon,
+  RotateCcw,
+  Sparkles,
+  ShieldCheck,
+} from 'lucide-react';
 import { soundManager } from '../utils/sound';
 
 export interface StepCardProps {
@@ -32,14 +46,16 @@ export const StepCard: React.FC<StepCardProps> = ({
   onStepStart,
 }) => {
   // Step micro-state:
-  // 'idle' -> 'visited' (clicked link, awaiting return/continue) -> 'timer_running' -> 'verifying' -> 'done'
   const [hasVisitedLink, setHasVisitedLink] = useState(false);
+  const [screenshotData, setScreenshotData] = useState<string | null>(null);
+  const [screenshotName, setScreenshotName] = useState<string | null>(null);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(waitingDurationSeconds);
   const [isVerifyingWithServer, setIsVerifyingWithServer] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [userReturnedFocus, setUserReturnedFocus] = useState(false);
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync remaining seconds if settings change
@@ -92,7 +108,7 @@ export const StepCard: React.FC<StepCardProps> = ({
     };
   }, [isTimerRunning]);
 
-  // When timer reaches zero, call backend to finalize step
+  // When timer reaches zero, call backend with screenshot to finalize step
   const handleFinishTimer = async () => {
     setIsTimerRunning(false);
     setIsVerifyingWithServer(true);
@@ -102,7 +118,11 @@ export const StepCard: React.FC<StepCardProps> = ({
       const response = await fetch('/api/session/step-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, step: stepNumber }),
+        body: JSON.stringify({
+          sessionId,
+          step: stepNumber,
+          screenshot: screenshotData,
+        }),
       });
       const data = await response.json();
 
@@ -136,7 +156,6 @@ export const StepCard: React.FC<StepCardProps> = ({
     try {
       const win = window.open(targetUrl, '_blank', 'noopener,noreferrer');
       if (!win) {
-        // Pop-up might be blocked on mobile browser; navigate directly or show notice
         window.location.href = targetUrl;
       }
     } catch {
@@ -144,8 +163,39 @@ export const StepCard: React.FC<StepCardProps> = ({
     }
   };
 
-  // User clicks "Continue"
+  // Handle image upload from user device / camera
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Please select a valid image file (PNG, JPG, JPEG, WEBP).');
+      return;
+    }
+
+    if (file.size > 12 * 1024 * 1024) {
+      setErrorMessage('Image size is too large (Maximum 12MB). Please upload a smaller screenshot.');
+      return;
+    }
+
+    setErrorMessage(null);
+    soundManager.playClick();
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setScreenshotData(result);
+      setScreenshotName(file.name);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // User clicks "Submit Screenshot & Verify"
   const handleStartCountdown = () => {
+    if (!screenshotData) {
+      setErrorMessage('Screenshot proof is required! Please upload a screenshot showing you followed.');
+      return;
+    }
     soundManager.playClick();
     setErrorMessage(null);
     setSecondsRemaining(waitingDurationSeconds);
@@ -240,7 +290,7 @@ export const StepCard: React.FC<StepCardProps> = ({
             {isCompleted ? (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold font-rajdhani bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
                 <Check className="w-3.5 h-3.5" />
-                <span>Verified</span>
+                <span>Screenshot Verified</span>
               </span>
             ) : isUnlocked ? (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold font-rajdhani bg-cyan-950/70 text-cyan-400 border border-cyan-500/30 animate-pulse">
@@ -267,83 +317,189 @@ export const StepCard: React.FC<StepCardProps> = ({
         <div className="mt-3">
           {/* STATE: COMPLETED */}
           {isCompleted && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/20 text-xs">
-              <div className="text-emerald-300/90 font-rajdhani text-sm flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Verification confirmed in this session.</span>
+            <div className="space-y-3 p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/20 text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="text-emerald-300/90 font-rajdhani text-sm font-semibold flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Follow Screenshot Verified & Approved!</span>
+                </div>
+                <a
+                  href={targetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-400 hover:text-emerald-300 underline font-rajdhani flex items-center gap-1 self-start sm:self-auto text-xs"
+                >
+                  <span>Revisit channel</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               </div>
-              <a
-                href={targetUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-400 hover:text-emerald-300 underline font-rajdhani flex items-center gap-1 self-start sm:self-auto text-xs"
-              >
-                <span>Revisit profile</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
+
+              {/* Show small thumbnail of verified screenshot if available */}
+              {screenshotData && (
+                <div className="flex items-center gap-3 pt-2 border-t border-emerald-500/20">
+                  <img
+                    src={screenshotData}
+                    alt="Proof Screenshot"
+                    className="w-12 h-12 object-cover rounded-lg border border-emerald-500/40"
+                  />
+                  <div className="text-[11px] font-space text-slate-300">
+                    <span className="text-emerald-400 font-bold block">Proof Screenshot Attached</span>
+                    <span className="text-slate-400 truncate max-w-xs block font-mono text-[10px]">
+                      {screenshotName || 'screenshot.png'}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* STATE: UNLOCKED & NOT COMPLETED */}
           {!isCompleted && isUnlocked && (
             <div className="space-y-3">
-              {/* If user hasn't clicked external link yet */}
+              {/* STAGE 1: User hasn't opened platform yet */}
               {!hasVisitedLink && !isTimerRunning && (
                 <div>
                   <button
                     onClick={handleOpenPlatform}
-                    className="w-full py-3 px-4 rounded-xl font-orbitron font-bold text-sm tracking-wide bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 text-black hover:from-emerald-400 hover:to-teal-300 transition-all shadow-[0_0_20px_rgba(0,255,102,0.4)] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3.5 px-4 rounded-xl font-orbitron font-bold text-sm tracking-wide bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 text-black hover:from-emerald-400 hover:to-teal-300 transition-all shadow-[0_0_20px_rgba(0,255,102,0.4)] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>{buttonText}</span>
                     <ExternalLink className="w-4 h-4" />
                   </button>
                   <p className="text-[11px] text-slate-400 text-center mt-2 font-space">
-                    Tap to open profile in a new tab or app. Then return here to continue.
+                    1. Tap above to follow/subscribe on {platform.toUpperCase()} → 2. Take a screenshot → 3. Upload proof here.
                   </p>
                 </div>
               )}
 
-              {/* If user clicked external link and we are awaiting Continue */}
+              {/* STAGE 2: User visited platform, now MUST upload screenshot to continue */}
               {hasVisitedLink && !isTimerRunning && !isVerifyingWithServer && (
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 space-y-3">
+                <div className="p-4 rounded-xl bg-slate-900/90 border border-cyan-500/30 space-y-3.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-cyan-300 font-semibold font-rajdhani flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                      {userReturnedFocus ? 'Welcome back! Ready for Step 2 verification' : 'Profile opened in background'}
+                      {userReturnedFocus ? 'Welcome back! Please attach proof' : 'Follow action opened in background'}
                     </span>
                     <button
                       onClick={handleOpenPlatform}
-                      className="text-slate-400 hover:text-cyan-400 underline text-[11px] font-rajdhani flex items-center gap-1"
+                      className="text-slate-400 hover:text-cyan-400 underline text-[11px] font-rajdhani flex items-center gap-1 cursor-pointer"
                     >
-                      <span>Open again</span>
+                      <span>Open channel again</span>
                       <ExternalLink className="w-2.5 h-2.5" />
                     </button>
                   </div>
 
+                  {/* Hidden file input for screenshot */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/*"
+                    className="hidden"
+                  />
+
+                  {/* Screenshot Upload Dropzone Area */}
+                  {!screenshotData ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-4 sm:p-5 rounded-xl border-2 border-dashed border-cyan-500/40 hover:border-cyan-400 bg-cyan-950/20 hover:bg-cyan-950/30 transition-all cursor-pointer text-center space-y-2 group"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                        <Camera className="w-5 h-5 text-cyan-300" />
+                      </div>
+                      <div>
+                        <div className="font-orbitron font-bold text-xs text-cyan-200">
+                          UPLOAD FOLLOW SCREENSHOT (REQUIRED)
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-space mt-0.5">
+                          Follow hone ke baad screenshot lein aur yahan upload karein.
+                        </p>
+                      </div>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-cyan-900/40 text-cyan-300 text-xs font-rajdhani font-semibold border border-cyan-500/30">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Select Screenshot from Gallery / Camera</span>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Screenshot Preview Card */
+                    <div className="p-3 rounded-xl bg-slate-950 border border-emerald-500/40 flex items-center justify-between gap-3 shadow-[0_0_15px_rgba(0,255,102,0.15)]">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative group shrink-0">
+                          <img
+                            src={screenshotData}
+                            alt="Screenshot Preview"
+                            className="w-14 h-14 object-cover rounded-lg border border-emerald-400 shadow-md"
+                          />
+                          <div className="absolute inset-0 bg-emerald-500/10 rounded-lg" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1 text-xs font-bold font-rajdhani text-emerald-400">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>SCREENSHOT ATTACHED</span>
+                          </div>
+                          <div className="text-slate-300 text-xs font-mono truncate max-w-[180px] sm:max-w-xs">
+                            {screenshotName || 'proof-screenshot.png'}
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-space">Ready to submit and unlock</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition-colors flex items-center gap-1 text-xs font-rajdhani shrink-0 cursor-pointer"
+                        title="Change Screenshot"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Change</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Submit Proof & Verify Button */}
                   <button
                     onClick={handleStartCountdown}
-                    className="w-full py-3 px-4 rounded-xl font-orbitron font-bold text-sm tracking-wide bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 text-black hover:from-cyan-400 hover:to-emerald-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer animate-pulse"
+                    disabled={!screenshotData}
+                    className={`w-full py-3.5 px-4 rounded-xl font-orbitron font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      screenshotData
+                        ? 'bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 text-black hover:from-cyan-300 hover:to-emerald-300 shadow-[0_0_25px_rgba(0,255,102,0.4)] active:scale-[0.99] animate-pulse'
+                        : 'bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-700'
+                    }`}
                   >
-                    <span>I Followed — Continue</span>
+                    <Sparkles className="w-4 h-4" />
+                    <span>{screenshotData ? 'SUBMIT SCREENSHOT & UNLOCK' : 'ATTACH SCREENSHOT FIRST'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
                   <p className="text-[11px] text-slate-400 text-center font-space leading-tight">
-                    Requires a {waitingDurationSeconds}-second dwell verification period to ensure genuine engagement.
+                    Follow karke screenshot submit karein. System {waitingDurationSeconds}s verification ke baad next step unlock karega.
                   </p>
                 </div>
               )}
 
-              {/* If timer is actively running */}
+              {/* STAGE 3: If timer is actively scanning screenshot */}
               {isTimerRunning && (
-                <div className="p-4 rounded-xl bg-slate-900/90 border border-emerald-500/40 text-center space-y-3 shadow-[0_0_20px_rgba(0,255,102,0.15)]">
+                <div className="p-4 rounded-xl bg-slate-900/95 border border-emerald-500/40 text-center space-y-3.5 shadow-[0_0_25px_rgba(0,255,102,0.2)]">
+                  {/* Holographic scanner preview */}
+                  {screenshotData && (
+                    <div className="relative w-28 h-28 mx-auto rounded-xl overflow-hidden border-2 border-emerald-400 shadow-[0_0_15px_rgba(0,255,102,0.3)]">
+                      <img
+                        src={screenshotData}
+                        alt="Scanning proof"
+                        className="w-full h-full object-cover filter brightness-90"
+                      />
+                      {/* Laser scanning beam */}
+                      <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-300 to-transparent shadow-[0_0_10px_#00ff66] animate-energy-scan" />
+                      <div className="absolute inset-0 bg-emerald-500/10 pointer-events-none" />
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-center gap-2 text-emerald-400 font-orbitron text-xs tracking-wider">
                     <Clock className="w-4 h-4 animate-spin text-emerald-400" />
-                    <span>VERIFYING ACTION... PLEASE WAIT</span>
+                    <span>VERIFYING SCREENSHOT PROOF...</span>
                   </div>
 
                   {/* Big Countdown Number */}
-                  <div className="py-2">
+                  <div className="py-1">
                     <span className="font-orbitron font-black text-4xl sm:text-5xl text-emerald-300 tracking-wider drop-shadow-[0_0_12px_rgba(0,255,102,0.6)]">
                       {secondsRemaining}s
                     </span>
@@ -366,17 +522,17 @@ export const StepCard: React.FC<StepCardProps> = ({
                   </div>
 
                   <p className="text-[11px] text-slate-400 font-space leading-tight">
-                    Notice: Please keep this page open. A return timer is verifying your dwell period.
+                    Checking screenshot proof and observing engagement dwell window.
                   </p>
                 </div>
               )}
 
-              {/* Verifying with server */}
+              {/* STAGE 4: Verifying with server */}
               {isVerifyingWithServer && (
                 <div className="p-4 rounded-xl bg-slate-900/90 border border-cyan-500/40 text-center space-y-2">
                   <Loader2 className="w-6 h-6 animate-spin text-cyan-400 mx-auto" />
                   <div className="text-xs font-orbitron text-cyan-300 font-bold tracking-wider">
-                    CONFIRMING STEP COMPLETION...
+                    SUBMITTING SCREENSHOT & UNLOCKING NEXT STEP...
                   </div>
                 </div>
               )}
@@ -388,7 +544,7 @@ export const StepCard: React.FC<StepCardProps> = ({
             <div className="p-3 rounded-lg bg-slate-900/40 border border-slate-800/80 text-xs text-slate-400 flex items-center justify-between font-rajdhani">
               <span className="flex items-center gap-2">
                 <Lock className="w-3.5 h-3.5 text-slate-600" />
-                <span>Locked until Step {stepNumber - 1} is verified.</span>
+                <span>Locked until Step {stepNumber - 1} screenshot is verified.</span>
               </span>
               <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Pending</span>
             </div>

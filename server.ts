@@ -170,9 +170,21 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
+interface ProofSubmission {
+  id: string;
+  sessionId: string;
+  step: number;
+  platform: string;
+  timestamp: string;
+  screenshot: string;
+}
+
+const proofSubmissions: ProofSubmission[] = [];
+
 async function startServer() {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '15mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
   // Initialize data store on boot
   readData();
@@ -244,13 +256,23 @@ async function startServer() {
     res.json({ success: true, stepStartedAt: now });
   });
 
-  // 4. STEP COMPLETE (User returned and waited required duration)
+  // 4. STEP COMPLETE (User returned, uploaded screenshot, and waited required duration)
   app.post('/api/session/step-complete', (req: Request, res: Response) => {
-    const { sessionId, step } = req.body;
+    const { sessionId, step, screenshot } = req.body;
     if (!sessionId || !visitorSessions.has(sessionId)) {
       res.status(400).json({ success: false, error: 'Invalid or expired session. Please refresh.' });
       return;
     }
+
+    // Screenshot proof validation
+    if (!screenshot || typeof screenshot !== 'string' || !screenshot.startsWith('data:image/')) {
+      res.status(400).json({
+        success: false,
+        error: 'Screenshot proof required! Please upload a screenshot proving you followed or subscribed.',
+      });
+      return;
+    }
+
     const session = visitorSessions.get(sessionId)!;
     const data = readData();
     const requiredMs = (data.settings.waitingSeconds - 1) * 1000; // 1s grace margin for network roundtrips
@@ -300,6 +322,20 @@ async function startServer() {
     } else {
       res.status(400).json({ success: false, error: 'Invalid step number.' });
       return;
+    }
+
+    // Store proof submission for Owner inspection
+    const platformName = step === 1 ? 'TikTok' : step === 2 ? 'Instagram' : 'YouTube';
+    proofSubmissions.unshift({
+      id: crypto.randomUUID(),
+      sessionId: sessionId.substring(0, 8),
+      step,
+      platform: platformName,
+      timestamp: new Date().toISOString(),
+      screenshot,
+    });
+    if (proofSubmissions.length > 50) {
+      proofSubmissions.pop();
     }
 
     res.json({
@@ -475,6 +511,20 @@ async function startServer() {
       adminTokens.delete(token);
     }
     res.json({ success: true });
+  });
+
+  // 12. ADMIN GET SCREENSHOT SUBMISSIONS
+  app.get('/api/admin/submissions', requireAdmin, (_req: Request, res: Response) => {
+    res.json({
+      success: true,
+      submissions: proofSubmissions,
+    });
+  });
+
+  // 13. ADMIN CLEAR SCREENSHOT SUBMISSIONS
+  app.delete('/api/admin/submissions', requireAdmin, (_req: Request, res: Response) => {
+    proofSubmissions.length = 0;
+    res.json({ success: true, message: 'Proof submissions cleared.' });
   });
 
   // VITE OR STATIC SERVING
